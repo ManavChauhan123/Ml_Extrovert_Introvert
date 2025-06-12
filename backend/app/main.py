@@ -7,12 +7,12 @@ from sqlalchemy.orm import Session
 import pickle
 import pandas as pd
 from typing import Dict
-
-from .core.database import get_db
+from .core.database import get_db,Base, engine
 from .schemas.classification import ClassificationInput, ClassificationOutput
 from .models.database import ClassificationHistory
-
 import os
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="ML Classification API", version="1.0.0")
 
