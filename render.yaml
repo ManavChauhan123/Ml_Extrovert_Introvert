@@ -9,19 +9,3 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.10
-      - key: DATABASE_HOSTNAME
-        value: localhost
-      - key: DATABASE_PORT
-        value: "5432"
-      - key: DATABASE_PASSWORD
-        value: cricket#123
-      - key: DATABASE_NAME
-        value: FASTAPI
-      - key: DATABASE_USERNAME
-        value: postgres
-      - key: SECRET_KEY
-        value: 09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7
-      - key: ALGORITHM
-        value: HS256
-      - key: ACCESS_TOKEN_EXPIRE_MINUTES
-        value: "30"
