@@ -53,6 +53,7 @@ async def serve_index(request: Request):
 def classify(input_data: ClassificationInput, db: Session = Depends(get_db)):
     try:
         print("🔍 Received Input:", input_data.features)
+           # --- Validate binary categorical fields ---
 
         df = pd.DataFrame([input_data.features])
         print("🧪 DataFrame created:", df)
