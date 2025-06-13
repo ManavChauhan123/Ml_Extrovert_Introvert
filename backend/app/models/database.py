@@ -2,8 +2,7 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, Text, JSON, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
-
-Base = declarative_base()
+from ..core.database import Base
 
 class ClassificationHistory(Base):
     __tablename__ = "classification_history"

@@ -7,86 +7,106 @@ from sqlalchemy.orm import Session
 import pickle
 import pandas as pd
 from typing import Dict
-from .core.database import get_db,Base, engine
+from .core.database import get_db, Base, engine
 from .schemas.classification import ClassificationInput, ClassificationOutput
 from .models.database import ClassificationHistory
 import os
+from .models import database as models  # 👈 import models to register them
+Base.metadata.create_all(bind=engine)  # 👈 tables will now be created
 
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="ML Classification API", version="1.0.0")
 
-# CORS middleware
+# CORS config for frontend access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # tighten this for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Mount static directory and templates
-frontend_path = os.path.join(os.path.dirname(__file__), "..", "..", "frontend")
+# --- ✅ Static and Template Setup --- #
+# Path to frontend root (2 levels up from backend/main.py)
+frontend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend"))
 
+# Mount /static => frontend/static/
 app.mount("/static", StaticFiles(directory=os.path.join(frontend_path, "static")), name="static")
+
+# ✅ Mount /eda => frontend/static/eda/
+app.mount("/eda", StaticFiles(directory=os.path.join(frontend_path, "static", "eda")), name="eda")
+
+# Jinja2 template path (index.html in frontend/)
 templates = Jinja2Templates(directory=frontend_path)
 
-# Load the trained classification model
+# --- ✅ Load ML model ---
 with open('models/classification_model.pickle', 'rb') as f:
     model_data = pickle.load(f)
 
+# --- ✅ Serve Frontend HTML ---
 @app.get("/", response_class=HTMLResponse)
 async def serve_index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
+# --- ✅ ML Prediction Endpoint ---
 @app.post("/classify", response_model=ClassificationOutput)
-async def classify(input_data: ClassificationInput, db: Session = Depends(get_db)):
+def classify(input_data: ClassificationInput, db: Session = Depends(get_db)):
     try:
-        # Convert input to DataFrame
+        print("🔍 Received Input:", input_data.features)
+
         df = pd.DataFrame([input_data.features])
-        
-        # Scale the input
+        print("🧪 DataFrame created:", df)
+
         scaled_input = model_data['scaler'].transform(df)
-        
-        # Make prediction
+        print("📊 Scaled input:", scaled_input)
+
         prediction = model_data['model'].predict(scaled_input)[0]
+        print("🔮 Prediction:", prediction)
+
         prediction_proba = model_data['model'].predict_proba(scaled_input)[0]
-        
-        # Convert prediction back to original label if label encoder was used
+        print("📈 Prediction Probabilities:", prediction_proba)
+
+        # Optional: check if label encoder exists
         if model_data['label_encoder']:
             predicted_class = model_data['label_encoder'].inverse_transform([prediction])[0]
-            class_names = model_data['classes']
         else:
             predicted_class = str(prediction)
-            class_names = [f"Class_{i}" for i in range(len(prediction_proba))]
-        
-        # Create probability dictionary
-        prob_dict = {class_names[i]: float(prob) for i, prob in enumerate(prediction_proba)}
-        
-        # Calculate confidence (max probability)
+
         confidence = float(max(prediction_proba))
-        
-        # Save to database
-        db_classification = ClassificationHistory(
+        print("✅ Predicted Class:", predicted_class)
+        print("🎯 Confidence:", confidence)
+
+        class_names = model_data['classes']
+        prob_dict = {class_names[i]: float(prob) for i, prob in enumerate(prediction_proba)}
+
+        # Save to DB
+        db_record = ClassificationHistory(
             input_data=input_data.features,
             predicted_class=predicted_class,
             prediction_probability=prob_dict,
             confidence=confidence,
             model_used=model_data['model_name']
         )
-        db.add(db_classification)
+        db.add(db_record)
         db.commit()
         
-        return ClassificationOutput(
-            predicted_class=predicted_class,
-            prediction_probabilities=prob_dict,
-            confidence=confidence,
-            model_used=model_data['model_name']
-        )
-        
+
+        output = ClassificationOutput(
+        predicted_class=predicted_class,
+        prediction_probabilities=prob_dict,
+        confidence=confidence,
+        model_used=model_data['model_name'])
+        print("📤 Final Response Output:", output)
+        return output
+
+
     except Exception as e:
+        print("❌ Exception:", e)
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
+# --- ✅ Model Metadata ---
 @app.get("/model-info")
 async def get_model_info():
     return {
@@ -99,11 +119,9 @@ async def get_model_info():
 
 @app.get("/model-comparison")
 async def get_model_comparison():
-    """Get comparison of all trained models"""
     models_comparison = []
-    
     for name, results in model_data['results'].items():
-        model_metrics = {
+        models_comparison.append({
             "model_name": name,
             "accuracy": results['test_accuracy'],
             "precision": results['test_precision'],
@@ -112,66 +130,57 @@ async def get_model_comparison():
             "roc_auc": results['test_roc_auc'],
             "best_params": results['best_params'],
             "confusion_matrix": results['confusion_matrix']
-        }
-        models_comparison.append(model_metrics)
-    
-    # Find best model based on F1 score
+        })
+
     best_model = max(models_comparison, key=lambda x: x['f1_score'])
-    
+
     return {
         "models": models_comparison,
         "best_model": best_model['model_name'],
         "best_metric": "f1_score"
     }
 
+# --- ✅ Classification History ---
 @app.get("/classification-history")
 async def get_classification_history(limit: int = 50, db: Session = Depends(get_db)):
-    """Get recent classification history"""
-    history = db.query(ClassificationHistory).order_by(
-        ClassificationHistory.timestamp.desc()
-    ).limit(limit).all()
-    
+    history = db.query(ClassificationHistory).order_by(ClassificationHistory.timestamp.desc()).limit(limit).all()
     return [
         {
-            "id": record.id,
-            "predicted_class": record.predicted_class,
-            "confidence": record.confidence,
-            "model_used": record.model_used,
-            "timestamp": record.timestamp
+            "id": r.id,
+            "predicted_class": r.predicted_class,
+            "confidence": r.confidence,
+            "model_used": r.model_used,
+            "timestamp": r.timestamp
         }
-        for record in history
+        for r in history
     ]
 
+# --- ✅ Class Distribution Chart ---
 @app.get("/class-distribution")
 async def get_class_distribution(db: Session = Depends(get_db)):
-    """Get distribution of predicted classes"""
     from sqlalchemy import func
-    
-    distribution = db.query(
+    result = db.query(
         ClassificationHistory.predicted_class,
         func.count(ClassificationHistory.predicted_class).label('count')
     ).group_by(ClassificationHistory.predicted_class).all()
-    
-    return {
-        "distribution": [
-            {"class": record.predicted_class, "count": record.count}
-            for record in distribution
-        ]
-    }
 
+    return {"distribution": [{"class": r.predicted_class, "count": r.count} for r in result]}
+
+# --- ✅ EDA Chart Info Endpoint ---
 @app.get("/eda")
 async def get_eda_results():
     return {
         "message": "EDA results for classification",
         "charts_available": [
-            "target_distribution", 
-            "correlation_matrix", 
+            "target_distribution",
+            "correlation_matrix",
             "feature_target_analysis",
-            "confusion_matrices",
-            "roc_curves"
+            "confusion_matrix",
+            "roc_curve"
         ]
     }
 
+# --- ✅ Health Check ---
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "model_loaded": model_data is not None}
