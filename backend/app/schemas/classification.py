@@ -10,7 +10,7 @@ class ClassificationOutput(BaseModel):
     predicted_class: str
     prediction_probabilities: Dict[str, float]
     confidence: float
-    model_used: str
+    model_used: str 
 
 class EDAResponse(BaseModel):
     correlation_matrix: Dict[str, Dict[str, float]]

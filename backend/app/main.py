@@ -114,7 +114,6 @@ async def get_model_info():
         "best_params": model_data['best_params'],
         "feature_names": model_data['feature_names'],
         "classes": model_data['classes'],
-        "results": model_data['results']
     }
 
 @app.get("/model-comparison")
@@ -155,16 +154,6 @@ async def get_classification_history(limit: int = 50, db: Session = Depends(get_
         for r in history
     ]
 
-# --- ✅ Class Distribution Chart ---
-@app.get("/class-distribution")
-async def get_class_distribution(db: Session = Depends(get_db)):
-    from sqlalchemy import func
-    result = db.query(
-        ClassificationHistory.predicted_class,
-        func.count(ClassificationHistory.predicted_class).label('count')
-    ).group_by(ClassificationHistory.predicted_class).all()
-
-    return {"distribution": [{"class": r.predicted_class, "count": r.count} for r in result]}
 
 # --- ✅ EDA Chart Info Endpoint ---
 @app.get("/eda")
@@ -180,7 +169,4 @@ async def get_eda_results():
         ]
     }
 
-# --- ✅ Health Check ---
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy", "model_loaded": model_data is not None}
+
