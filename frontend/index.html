@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ML Classification Dashboard</title>
 
   <!-- Bootstrap & Font Awesome -->
@@ -15,6 +16,7 @@
   <!-- Custom Styles -->
   <link href="/static/css/style.css" rel="stylesheet" />
 </head>
+
 <body class="bg-dark text-light">
 
   <nav class="navbar navbar-expand-lg navbar-dark bg-gradient-purple shadow">
@@ -60,10 +62,14 @@
         <div class="card-body">
           <p>Understand your dataset with distribution plots, correlations, and feature analysis.</p>
           <div class="row text-center mb-3">
-            <div class="col-md-3"><button class="btn btn-outline-purple w-100 mb-2" onclick="showEDAImage('target-distribution')">Target Distribution</button></div>
-            <div class="col-md-3"><button class="btn btn-outline-purple w-100 mb-2" onclick="showEDAImage('correlation-matrix')">Correlation Matrix</button></div>
-            <div class="col-md-3"><button class="btn btn-outline-purple w-100 mb-2" onclick="showEDAImage('feature-analysis')">Feature Analysis</button></div>
-            <div class="col-md-3"><button class="btn btn-outline-purple w-100 mb-2" onclick="showEDAImage('confusion-matrix')">Confusion Matrix</button></div>
+            <div class="col-md-3"><button class="btn btn-outline-purple w-100 mb-2"
+                onclick="showEDAImage('target-distribution')">Target Distribution</button></div>
+            <div class="col-md-3"><button class="btn btn-outline-purple w-100 mb-2"
+                onclick="showEDAImage('correlation-matrix')">Correlation Matrix</button></div>
+            <div class="col-md-3"><button class="btn btn-outline-purple w-100 mb-2"
+                onclick="showEDAImage('feature-analysis')">Feature Analysis</button></div>
+            <div class="col-md-3"><button class="btn btn-outline-purple w-100 mb-2"
+                onclick="showEDAImage('confusion-matrix')">Confusion Matrix</button></div>
           </div>
           <div id="eda-content" class="text-center mt-3"></div>
         </div>
@@ -145,12 +151,34 @@
         features.forEach((feature) => {
           const col = document.createElement("div");
           col.className = "col-md-4 mb-2";
+
+          let labelText = feature;
+          let inputHTML = "";
+
+          // For binary categorical fields, use dropdown
+          if (["Stage_fear", "Drained_after_socializing"].includes(feature)) {
+            labelText += " (0 - No, 1 - Yes)";
+            inputHTML = `
+      <select class="form-control" name="${feature}" required>
+        <option value="">Select</option>
+        <option value="0">0 - No</option>
+        <option value="1">1 - Yes</option>
+      </select>
+    `;
+          } else {
+            // For all other features, use numeric input
+            inputHTML = `
+      <input type="number" step="any" class="form-control" name="${feature}" required />
+    `;
+          }
+
           col.innerHTML = `
-            <label class="form-label">${feature}</label>
-            <input type="number" step="any" class="form-control" name="${feature}" required />
-          `;
+    <label class="form-label">${labelText}</label>
+    ${inputHTML}
+  `;
           inputsDiv.appendChild(col);
         });
+
       } catch (error) {
         console.error("Error loading features:", error);
       }
@@ -323,4 +351,5 @@
     });
   </script>
 </body>
+
 </html>
